@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Dashboard</h1>
+<section class="stats">
+  <div class="stat"><strong>{{ total_companies }}</strong><span class="muted">Companies tracked</span></div>
+  <div class="stat"><strong>{{ active_jobs }}</strong><span class="muted">Active jobs seen</span></div>
+  <div class="stat"><strong>{{ new_last_24h }}</strong><span class="muted">New jobs in 24h</span></div>
+  <div class="stat"><strong>{{ last_check.started_at if last_check else "Never" }}</strong><span class="muted">Last check</span></div>
+</section>
+
+<h2>Recent matched jobs</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Title</th><th>Location</th><th>First seen</th><th>Apply</th></tr></thead>
+    <tbody>
+      {% for job in recent_matched %}
+      <tr><td>{{ job.title }}</td><td>{{ job.location or "" }}</td><td>{{ job.first_seen_at }}</td><td><a href="{{ job.url }}">Open</a></td></tr>
+      {% else %}
+      <tr><td colspan="4" class="muted">No matched jobs yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Recent check failures</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Started</th><th>Company ID</th><th>Error</th></tr></thead>
+    <tbody>
+      {% for failure in failures %}
+      <tr><td>{{ failure.started_at }}</td><td>{{ failure.company_id }}</td><td>{{ failure.error_message }}</td></tr>
+      {% else %}
+      <tr><td colspan="3" class="muted">No recent failures.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

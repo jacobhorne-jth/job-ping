@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Companies</h1>
+<div class="panel" style="margin-bottom:12px">
+  <div class="actions">
+    <form method="post" action="/ui/companies/enable-starter"><button>Enable starter set</button></form>
+    <form method="post" action="/ui/companies/check-enabled"><button class="secondary">Check enabled now</button></form>
+    <form method="post" action="/ui/companies/disable-all"><button class="danger">Disable all</button></form>
+    <span class="badge">Starter: OpenAI, Google, NVIDIA, Stripe, Databricks</span>
+    <span class="badge">Max alerts/check: {{ settings.max_alerts_per_check }}</span>
+    <span class="badge">Generic emails: {{ "On" if settings.allow_generic_alerts else "Off" }}</span>
+  </div>
+</div>
+<form method="post" action="/ui/companies" class="inline-card">
+  <div class="grid">
+    <div><label>Name</label><input name="name" required></div>
+    <div><label>Career URL</label><input name="career_url" required></div>
+    <div><label>Source type</label><select name="source_type"><option>auto</option><option>amazon_jobs</option><option>greenhouse</option><option>lever</option><option>ashby</option><option>google_careers</option><option>smartrecruiters</option><option>tesla</option><option>workday</option><option>direct_html</option><option>phenom_static</option><option>oracle_hcm</option><option>generic_static</option><option>generic_playwright</option></select></div>
+    <div><label>Check interval minutes</label><input name="check_interval_minutes" type="number" value="{{ settings.default_check_interval_minutes }}" min="30"></div>
+    <div><label>Include keywords</label><textarea name="keywords">{{ settings.default_keywords | join(", ") }}</textarea></div>
+    <div><label>Exclude keywords</label><textarea name="exclude_keywords">{{ settings.default_exclude_keywords | join(", ") }}</textarea></div>
+    <div><label>Locations</label><textarea name="locations"></textarea></div>
+    <div><label>Notes</label><textarea name="notes"></textarea></div>
+  </div>
+  <p><label><input type="checkbox" name="enabled" value="true" style="width:auto"> Enabled</label></p>
+  <button>Add company</button>
+</form>
+
+<h2>Tracked companies</h2>
+{% for company in companies %}
+<form method="post" action="/ui/companies/{{ company.id }}/update" class="inline-card" style="margin-bottom:12px">
+  <div class="row-form">
+    <div class="grid">
+      <div><label>Name</label><input name="name" value="{{ company.name }}"></div>
+      <div><label>Career URL</label><input name="career_url" value="{{ company.career_url }}"></div>
+      <div><label>Source type</label><input name="source_type" value="{{ company.source_type }}"></div>
+      <div><label>Check interval minutes</label><input name="check_interval_minutes" type="number" value="{{ company.check_interval_minutes }}" min="30"></div>
+      <div><label>Include keywords</label><textarea name="keywords">{{ loads_list(company.keywords) | join(", ") }}</textarea></div>
+      <div><label>Exclude keywords</label><textarea name="exclude_keywords">{{ loads_list(company.exclude_keywords) | join(", ") }}</textarea></div>
+      <div><label>Locations</label><textarea name="locations">{{ loads_list(company.locations) | join(", ") }}</textarea></div>
+      <div><label>Notes</label><textarea name="notes">{{ company.notes or "" }}</textarea></div>
+    </div>
+    <div class="actions">
+      <label><input type="checkbox" name="enabled" value="true" style="width:auto" {% if company.enabled %}checked{% endif %}> Enabled</label>
+      <span class="badge">Last checked: {{ company.last_checked_at or "Never" }}</span>
+      <button>Save</button>
+      <button class="secondary" type="submit" formaction="/ui/companies/{{ company.id }}/check-now">Check now</button>
+      <button class="danger" type="submit" formaction="/ui/companies/{{ company.id }}/delete">Delete</button>
+    </div>
+  </div>
+</form>
+{% else %}
+<p class="muted">No companies yet.</p>
+{% endfor %}
+{% endblock %}

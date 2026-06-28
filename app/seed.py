@@ -1,0 +1,264 @@
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.config import get_settings
+from app.models import Company
+from app.services.json_helpers import dumps_list
+from app.services.source_detector import detect_source_type
+
+
+SEED_COMPANIES = [
+    # FAANG / mega-cap platforms
+    ("Google", "https://www.google.com/about/careers/applications/jobs/results"),
+    ("Meta", "https://www.metacareers.com/jobsearch/"),
+    ("Amazon", "https://www.amazon.jobs/en/search.json?base_query=software%20engineer%20intern&loc_query="),
+    ("AWS", "https://www.amazon.jobs/en/search.json"),
+    ("Apple", "https://jobs.apple.com/en-us/search"),
+    ("Microsoft", "https://jobs.careers.microsoft.com/global/en/search"),
+    ("LinkedIn", "https://boards.greenhouse.io/linkedin"),
+    ("Netflix", "https://www.netflix.com/jobs/search"),
+    ("NVIDIA", "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite"),
+    ("Tesla", "https://www.tesla.com/careers/search/?type=intern&site=US"),
+    # Major enterprise, cloud, and hardware tech
+    ("Salesforce", "https://salesforce.wd12.myworkdayjobs.com/External_Career_Site"),
+    ("Adobe", "https://adobe.wd5.myworkdayjobs.com/external_experienced"),
+    ("Oracle", "https://careers.oracle.com/en/sites/jobsearch"),
+    ("IBM", "https://www.ibm.com/careers/search"),
+    ("Intel", "https://intel.wd1.myworkdayjobs.com/External"),
+    ("AMD", "https://careers.amd.com/careers-home"),
+    ("Arm", "https://careers.arm.com/search-jobs/intern/33099/1"),
+    ("Qualcomm", "https://careers.qualcomm.com/careers"),
+    ("Samsung", "https://sec.wd3.myworkdayjobs.com/Samsung_Careers"),
+    ("Cisco", "https://careers.cisco.com/global/en/search-results?keywords=software"),
+    ("Dell", "https://iawmqy.fa.ocs.oraclecloud.com/hcmUI/CandidateExperience/en/sites/careers"),
+    ("HP", "https://hp.wd5.myworkdayjobs.com/ExternalCareerSite"),
+    ("Nokia", "https://www.nokia.com/about-us/careers/"),
+    ("T-Mobile", "https://tmobile.wd1.myworkdayjobs.com/External"),
+    ("ServiceNow", "https://api.smartrecruiters.com/v1/companies/ServiceNow/postings"),
+    ("Workday", "https://workday.wd5.myworkdayjobs.com/Workday"),
+    ("Red Hat", "https://redhat.wd5.myworkdayjobs.com/jobs"),
+    ("SAP", "https://jobs.sap.com/"),
+    ("HubSpot", "https://www.hubspot.com/careers/jobs"),
+    ("Veeva Systems", "https://jobs.lever.co/veeva"),
+    # Developer tools, data, infra, and SaaS
+    ("Databricks", "https://boards.greenhouse.io/databricks"),
+    ("Snowflake", "https://jobs.ashbyhq.com/snowflake"),
+    ("Palantir", "https://jobs.lever.co/palantir"),
+    ("Atlassian", "https://www.atlassian.com/company/careers/all-jobs"),
+    ("Cloudflare", "https://boards.greenhouse.io/cloudflare"),
+    ("Datadog", "https://boards.greenhouse.io/datadog"),
+    ("MongoDB", "https://boards.greenhouse.io/mongodb"),
+    ("GitLab", "https://boards.greenhouse.io/gitlab"),
+    ("HashiCorp", "https://www.hashicorp.com/careers/open-positions"),
+    ("Elastic", "https://boards.greenhouse.io/elastic"),
+    ("Okta", "https://boards.greenhouse.io/okta"),
+    ("Twilio", "https://boards.greenhouse.io/twilio"),
+    ("Dropbox", "https://boards.greenhouse.io/dropbox"),
+    ("Asana", "https://boards.greenhouse.io/asana"),
+    ("Notion", "https://jobs.ashbyhq.com/notion"),
+    ("Figma", "https://boards.greenhouse.io/figma"),
+    ("Scale AI", "https://boards.greenhouse.io/scaleai"),
+    ("Rippling", "https://www.rippling.com/careers/open-roles"),
+    ("Brex", "https://boards.greenhouse.io/brex"),
+    ("Ramp", "https://jobs.ashbyhq.com/Ramp"),
+    # Consumer, marketplace, fintech, and media tech
+    ("Stripe", "https://boards.greenhouse.io/stripe"),
+    ("Block", "https://boards.greenhouse.io/block"),
+    ("Square", "https://squareup.com/us/en/careers"),
+    ("PayPal", "https://www.paypal.com/us/webapps/mpp/jobs"),
+    ("Coinbase", "https://boards.greenhouse.io/coinbase"),
+    ("Plaid", "https://jobs.ashbyhq.com/plaid"),
+    ("Chime", "https://boards.greenhouse.io/chime"),
+    ("Affirm", "https://boards.greenhouse.io/affirm"),
+    ("SoFi", "https://boards.greenhouse.io/sofi"),
+    ("Intuit", "https://www.intuit.com/careers/"),
+    ("Robinhood", "https://boards.greenhouse.io/robinhood"),
+    ("Uber", "https://jobs.uber.com/en/jobs/"),
+    ("Lyft", "https://boards.greenhouse.io/lyft"),
+    ("Airbnb", "https://boards.greenhouse.io/airbnb"),
+    ("DoorDash", "https://boards.greenhouse.io/doordashusa"),
+    ("Instacart", "https://boards.greenhouse.io/instacart"),
+    ("Pinterest", "https://boards.greenhouse.io/pinterest"),
+    ("Snap", "https://careers.snap.com/jobs?query=intern"),
+    ("Reddit", "https://boards.greenhouse.io/reddit"),
+    ("Roblox", "https://boards.greenhouse.io/roblox"),
+    ("Discord", "https://boards.greenhouse.io/discord"),
+    ("Spotify", "https://jobs.lever.co/spotify"),
+    ("Zoom", "https://careers.zoom.us/"),
+    ("Shopify", "https://www.shopify.com/careers"),
+    ("Samsara", "https://boards.greenhouse.io/samsara"),
+    ("Walmart", "https://careers.walmart.com/"),
+    ("Zillow", "https://zillow.wd5.myworkdayjobs.com/Zillow_Group_External"),
+    ("Redfin", "https://www.redfin.com/careers"),
+    ("Expedia Group", "https://expedia.wd108.myworkdayjobs.com/search"),
+    ("Indeed", "https://www.indeed.com/cmp/Indeed/jobs"),
+    ("Yahoo", "https://www.yahooinc.com/careers/"),
+    ("eBay", "https://jobs.ebayinc.com/us/en/search-results"),
+    ("Twitch", "https://boards.greenhouse.io/twitch"),
+    ("Ticketmaster", "https://livenation.wd503.myworkdayjobs.com/LNExternalSite"),
+    # Games, entertainment, and media tech
+    ("Zynga", "https://job-boards.greenhouse.io/zyngacareers"),
+    ("Epic Games", "https://boards.greenhouse.io/epicgames"),
+    ("Sony PlayStation", "https://job-boards.greenhouse.io/sonyinteractiveentertainmentglobal"),
+    ("Bloomberg", "https://careers.bloomberg.com/job/search"),
+    # AI labs and newer large tech employers
+    ("OpenAI", "https://jobs.ashbyhq.com/OpenAI"),
+    ("Anthropic", "https://boards.greenhouse.io/anthropic"),
+    ("Neuralink", "https://boards.greenhouse.io/neuralink"),
+    ("Anduril", "https://boards.greenhouse.io/andurilindustries"),
+    ("Waymo", "https://boards.greenhouse.io/waymo"),
+    ("Cruise", "https://getcruise.com/careers/jobs/"),
+    ("ByteDance", "https://jobs.bytedance.com/en"),
+    ("TikTok", "https://careers.tiktok.com/"),
+    # Finance, payments, and trading
+    ("Visa", "https://visa.wd5.myworkdayjobs.com/Visa"),
+    ("Mastercard", "https://mastercard.wd1.myworkdayjobs.com/CorporateCareers"),
+    ("American Express", "https://www.americanexpress.com/en-us/careers/"),
+    ("JPMorgan Chase", "https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/jobs"),
+    ("Goldman Sachs", "https://www.goldmansachs.com/careers/students/programs-and-internships/"),
+    ("Morgan Stanley", "https://www.morganstanley.com/people-opportunities/students-graduates"),
+    ("BlackRock", "https://careers.blackrock.com/early-careers"),
+    ("Jane Street", "https://boards.greenhouse.io/janestreet"),
+    ("Hudson River Trading", "https://www.hudsonrivertrading.com/careers/"),
+    ("Citadel", "https://www.citadel.com/careers/open-opportunities/"),
+    ("Citadel Securities", "https://www.citadelsecurities.com/careers/open-opportunities/"),
+    ("Two Sigma", "https://www.twosigma.com/careers/"),
+    # Other useful targets from the requested lists
+    ("Capital One", "https://www.capitalonecareers.com/search-jobs/software%20engineer/1732/1"),
+    ("Wells Fargo", "https://www.wellsfargojobs.com/en/jobs/"),
+    ("Palo Alto Networks", "https://paloaltonetworks.wd5.myworkdayjobs.com/panwexternalcareers"),
+    ("Slack", "https://salesforce.wd12.myworkdayjobs.com/Slack"),
+    ("Handshake", "https://jobs.ashbyhq.com/handshake"),
+    ("NimbleRx", "https://jobs.lever.co/nimblerx"),
+    ("RTX", "https://careers.rtx.com/global/en"),
+    ("Raytheon", "https://careers.rtx.com/global/en/raytheon"),
+]
+
+PRIORITY_EXPANSION_COMPANIES = [
+    # Tier 1: highest resume signal / hardest-to-catch targets
+    ("Jump Trading", "https://boards.greenhouse.io/jumptrading", "Priority 1: trading / systems target."),
+    ("Optiver", "https://www.optiver.com/join-us/jobs/", "Priority 1: trading / systems target."),
+    ("IMC Trading", "https://boards.greenhouse.io/imc", "Priority 1: trading / systems target."),
+    ("DRW", "https://drw.com/work-at-drw/listings/", "Priority 1: trading / systems target."),
+    ("SIG", "https://careers.sig.com/", "Priority 1: trading / systems target."),
+    ("Akuna Capital", "https://boards.greenhouse.io/akunacapital", "Priority 1: trading / systems target."),
+    ("Five Rings", "https://job-boards.greenhouse.io/fiveringsllc", "Priority 1: trading / systems target."),
+    ("D. E. Shaw", "https://www.deshaw.com/careers", "Priority 1: trading / systems target."),
+    ("SpaceX", "https://boards.greenhouse.io/spacex", "Priority 1: aerospace / systems target."),
+    ("Applied Intuition", "https://boards.greenhouse.io/appliedintuition", "Priority 1: autonomy / systems target."),
+    ("Mercury", "https://jobs.ashbyhq.com/mercury", "Priority 1: fintech / infra target."),
+    ("Circle", "https://circle.wd1.myworkdayjobs.com/Circle", "Priority 1: fintech / crypto infra target."),
+    # Tier 2: AI, security, robotics, and high-growth engineering brands
+    ("Cohere", "https://jobs.ashbyhq.com/cohere", "Priority 2: AI / ML target."),
+    ("Hugging Face", "https://huggingface.co/jobs", "Priority 2: AI / ML target."),
+    ("Perplexity AI", "https://jobs.ashbyhq.com/perplexity", "Priority 2: AI / ML target."),
+    ("xAI", "https://boards.greenhouse.io/xai", "Priority 2: AI / ML target."),
+    ("Character.AI", "https://jobs.ashbyhq.com/character", "Priority 2: AI / ML target."),
+    ("Glean", "https://boards.greenhouse.io/gleanwork", "Priority 2: AI / ML target."),
+    ("Anysphere", "https://anysphere.co/careers", "Priority 2: AI coding tools target."),
+    ("LangChain", "https://jobs.ashbyhq.com/langchain", "Priority 2: AI infra target."),
+    ("Harvey", "https://jobs.ashbyhq.com/harvey", "Priority 2: AI / legal tech target."),
+    ("Runway", "https://jobs.ashbyhq.com/runway", "Priority 2: AI / media target."),
+    ("Adept", "https://www.adept.ai/careers", "Priority 2: AI agents target."),
+    ("Physical Intelligence", "https://jobs.ashbyhq.com/physicalintelligence", "Priority 2: AI robotics target."),
+    ("Figure AI", "https://boards.greenhouse.io/figureai", "Priority 2: AI robotics target."),
+    ("CoreWeave", "https://boards.greenhouse.io/coreweave", "Priority 2: AI infrastructure target."),
+    ("Lambda Labs", "https://jobs.ashbyhq.com/lambda", "Priority 2: AI infrastructure target."),
+    ("Together AI", "https://boards.greenhouse.io/togetherai", "Priority 2: AI infrastructure target."),
+    ("Weights & Biases", "https://wandb.ai/careers", "Priority 2: AI developer tools target."),
+    ("CrowdStrike", "https://crowdstrike.wd5.myworkdayjobs.com/crowdstrikecareers", "Priority 2: security / systems target."),
+    ("Zscaler", "https://boards.greenhouse.io/zscaler", "Priority 2: security / networking target."),
+    ("Wiz", "https://boards.greenhouse.io/wizinc", "Priority 2: cloud security target."),
+    ("Snyk", "https://snyk.io/careers/", "Priority 2: developer security target."),
+    ("SentinelOne", "https://www.sentinelone.com/careers/", "Priority 2: security / AI target."),
+    ("Rubrik", "https://boards.greenhouse.io/rubrik", "Priority 2: security / data infra target."),
+    ("Vanta", "https://jobs.ashbyhq.com/vanta", "Priority 2: security / compliance target."),
+    ("Verkada", "https://boards.greenhouse.io/verkada", "Priority 2: security / hardware systems target."),
+    ("Tanium", "https://boards.greenhouse.io/tanium", "Priority 2: endpoint security target."),
+    ("Zoox", "https://jobs.lever.co/zoox", "Priority 2: autonomy / robotics target."),
+    ("Aurora", "https://boards.greenhouse.io/aurorainnovation", "Priority 2: autonomy / robotics target."),
+    ("Nuro", "https://boards.greenhouse.io/nuro", "Priority 2: autonomy / robotics target."),
+    ("Zipline", "https://www.flyzipline.com/careers", "Priority 2: robotics / logistics target."),
+    ("Skydio", "https://jobs.ashbyhq.com/skydio", "Priority 2: robotics / autonomy target."),
+    ("Shield AI", "https://jobs.lever.co/shieldai", "Priority 2: autonomy / defense target."),
+    ("Rivian", "https://rivian.com/careers", "Priority 2: EV / systems target."),
+    ("Lucid", "https://boards.greenhouse.io/lucidmotors", "Priority 2: EV / systems target."),
+    ("Boston Dynamics", "https://bostondynamics.wd1.myworkdayjobs.com/Boston_Dynamics", "Priority 2: robotics target."),
+    ("Intuitive Surgical", "https://api.smartrecruiters.com/v1/companies/intuitive/postings", "Priority 2: robotics / medical systems target."),
+    ("Broadcom", "https://www.broadcom.com/company/careers", "Priority 2: hardware / systems target."),
+    # Tier 3: games, media, fintech, consumer, and enterprise breadth
+    ("Riot Games", "https://boards.greenhouse.io/riotgames", "Priority 3: games / consumer tech target."),
+    ("Electronic Arts", "https://www.ea.com/careers", "Priority 3: games / consumer tech target."),
+    ("Unity", "https://unity.com/careers", "Priority 3: games / engine target."),
+    ("Nintendo", "https://boards.greenhouse.io/nintendo", "Priority 3: games / consumer tech target."),
+    ("Activision Blizzard", "https://careers.activisionblizzard.com/search-results", "Priority 3: games / consumer tech target."),
+    ("Disney", "https://www.disneycareers.com/", "Priority 3: media / streaming target."),
+    ("Warner Bros. Discovery", "https://careers.wbd.com/global/en/search-results", "Priority 3: media / streaming target."),
+    ("Paramount", "https://www.paramount.com/careers", "Priority 3: media / streaming target."),
+    ("Duolingo", "https://boards.greenhouse.io/duolingo", "Priority 3: consumer / education target."),
+    ("Canva", "https://api.smartrecruiters.com/v1/companies/canva/postings", "Priority 3: design / consumer SaaS target."),
+    ("Yelp", "https://www.yelp.careers/us/en/search-results", "Priority 3: marketplace / consumer target."),
+    ("Etsy", "https://www.etsy.com/careers", "Priority 3: marketplace / consumer target."),
+    ("Bank of America", "https://careers.bankofamerica.com/en-us", "Priority 3: finance target."),
+    ("Fidelity", "https://jobs.fidelity.com/", "Priority 3: finance target."),
+    ("Charles Schwab", "https://www.schwabjobs.com/search-jobs/intern/33727/1", "Priority 3: finance target."),
+    ("Capital Group", "https://capgroup.wd1.myworkdayjobs.com/capitalgroupcareers", "Priority 3: finance target."),
+    ("Discover", "https://jobs.discover.com/", "Priority 3: fintech / payments target."),
+    ("Autodesk", "https://autodesk.wd1.myworkdayjobs.com/Ext", "Priority 3: enterprise software target."),
+    ("Splunk", "https://www.splunk.com/en_us/careers.html", "Priority 3: infra / observability target."),
+    ("Confluent", "https://jobs.ashbyhq.com/confluent", "Priority 3: data infra target."),
+    ("Cockroach Labs", "https://boards.greenhouse.io/cockroachlabs", "Priority 3: database infra target."),
+    ("Akamai", "https://www.akamai.com/careers", "Priority 3: networking / edge target."),
+    ("Box", "https://www.box.com/about-us/careers", "Priority 3: enterprise SaaS target."),
+    ("DocuSign", "https://api.smartrecruiters.com/v1/companies/docusign/postings", "Priority 3: enterprise SaaS target."),
+    ("Qualtrics", "https://www.qualtrics.com/careers/us/en/search-results", "Priority 3: enterprise SaaS target."),
+    ("Toast", "https://boards.greenhouse.io/toast", "Priority 3: fintech / restaurant tech target."),
+    ("Gusto", "https://boards.greenhouse.io/gusto", "Priority 3: fintech / HR tech target."),
+    ("Coupang", "https://boards.greenhouse.io/coupang", "Priority 3: marketplace / logistics target."),
+    ("Booking.com", "https://jobs.booking.com/careers", "Priority 3: travel marketplace target."),
+]
+
+PRIORITY_NOTES_BY_NAME = {name: notes for name, _, notes in PRIORITY_EXPANSION_COMPANIES}
+
+
+def seed_companies(db: Session) -> None:
+    settings = get_settings()
+    existing_names = set(db.scalars(select(Company.name)).all())
+    for name, url in SEED_COMPANIES:
+        if name in existing_names:
+            continue
+        db.add(
+            Company(
+                name=name,
+                career_url=url,
+                source_type=detect_source_type(url),
+                enabled=False,
+                keywords=dumps_list(settings.default_keywords),
+                exclude_keywords=dumps_list(settings.default_exclude_keywords),
+                locations=dumps_list([]),
+                check_interval_minutes=settings.default_check_interval_minutes,
+                notes="Seed example. Enable and edit before using.",
+            )
+        )
+        existing_names.add(name)
+    for name, url, notes in PRIORITY_EXPANSION_COMPANIES:
+        if name in existing_names:
+            company = db.scalar(select(Company).where(Company.name == name))
+            if company and not company.notes:
+                company.notes = notes
+            continue
+        db.add(
+            Company(
+                name=name,
+                career_url=url,
+                source_type=detect_source_type(url),
+                enabled=False,
+                keywords=dumps_list(settings.default_keywords),
+                exclude_keywords=dumps_list(settings.default_exclude_keywords),
+                locations=dumps_list([]),
+                check_interval_minutes=settings.default_check_interval_minutes,
+                notes=notes,
+            )
+        )
+        existing_names.add(name)
+    db.commit()

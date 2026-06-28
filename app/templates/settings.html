@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Settings</h1>
+{% if message %}<p class="panel">{{ message }}</p>{% endif %}
+<div class="panel">
+  <table>
+    <tr><th>Recipient email</th><td>{{ settings.alert_to_email or "Not configured" }}</td></tr>
+    <tr><th>SMTP host</th><td>{{ settings.smtp_host or "Not configured" }}</td></tr>
+    <tr><th>SMTP port</th><td>{{ settings.smtp_port }}</td></tr>
+    <tr><th>SMTP username</th><td>{{ settings.smtp_username or "Not configured" }}</td></tr>
+    <tr><th>SMTP from</th><td>{{ settings.smtp_from_email or "Not configured" }}</td></tr>
+    <tr><th>Password</th><td>{{ "Configured" if settings.smtp_password and settings.smtp_password != "PASTE_GMAIL_APP_PASSWORD_HERE" else "Not configured" }}</td></tr>
+    <tr><th>Alert on all jobs</th><td>{{ "Yes" if settings.alert_on_all_jobs else "No" }}</td></tr>
+    <tr><th>Generic scraper emails</th><td>{{ "Allowed" if settings.allow_generic_alerts else "Blocked" }}</td></tr>
+    <tr><th>Max alerts per check</th><td>{{ settings.max_alerts_per_check }}</td></tr>
+    <tr><th>Default interval</th><td>{{ settings.default_check_interval_minutes }} minutes</td></tr>
+    <tr><th>Default include keywords</th><td>{{ settings.default_keywords | join(", ") }}</td></tr>
+    <tr><th>Default exclude keywords</th><td>{{ settings.default_exclude_keywords | join(", ") }}</td></tr>
+  </table>
+</div>
+<h2>Test email</h2>
+<form method="post" action="/ui/settings/test-email" class="inline-card">
+  <label>Recipient override</label>
+  <input name="recipient_email" value="{{ settings.alert_to_email or '' }}">
+  <p><button>Send test email</button></p>
+</form>
+{% endblock %}

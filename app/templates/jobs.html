@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Jobs</h1>
+<form method="get" action="/ui/jobs" class="inline-card">
+  <div class="grid">
+    <div><label>Company</label><select name="company_id"><option value="">All</option>{% for company in companies %}<option value="{{ company.id }}" {% if filters.company_id == company.id %}selected{% endif %}>{{ company.name }}</option>{% endfor %}</select></div>
+    <div><label>Keyword</label><input name="keyword" value="{{ filters.keyword or '' }}"></div>
+    <div><label>Location</label><input name="location" value="{{ filters.location or '' }}"></div>
+    <div class="actions"><label><input type="checkbox" name="active" value="true" style="width:auto" {% if filters.active %}checked{% endif %}> Active only</label><label><input type="checkbox" name="matched" value="true" style="width:auto" {% if filters.matched %}checked{% endif %}> Matched only</label></div>
+  </div>
+  <p><button>Filter</button> <a class="button" href="/ui/jobs">Clear</a></p>
+</form>
+
+<h2>Seen jobs</h2>
+<div class="panel">
+  <table>
+    <thead><tr><th>Company</th><th>Title</th><th>Location</th><th>First seen</th><th>Last seen</th><th>Status</th><th>Matched</th><th>Apply</th></tr></thead>
+    <tbody>
+      {% for job in jobs %}
+      <tr>
+        <td>{{ job.company.name }}</td>
+        <td>{{ job.title }}</td>
+        <td>{{ job.location or "" }}</td>
+        <td>{{ job.first_seen_at }}</td>
+        <td>{{ job.last_seen_at }}</td>
+        <td>{{ "Active" if job.is_active else "Inactive" }}</td>
+        <td>{{ loads_list(job.matched_keywords) | join(", ") }}</td>
+        <td><a href="{{ job.url }}">Open</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="muted">No jobs found yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
