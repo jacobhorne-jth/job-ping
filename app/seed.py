@@ -198,7 +198,7 @@ PRIORITY_EXPANSION_COMPANIES = [
     ("Duolingo", "https://boards.greenhouse.io/duolingo", "Priority 3: consumer / education target."),
     ("Canva", "https://api.smartrecruiters.com/v1/companies/canva/postings", "Priority 3: design / consumer SaaS target."),
     ("Yelp", "https://www.yelp.careers/us/en/search-results", "Priority 3: marketplace / consumer target."),
-    ("Etsy", "https://www.etsy.com/careers", "Priority 3: marketplace / consumer target."),
+    ("Etsy", "https://careers.etsy.com", "Priority 3: marketplace / consumer target."),
     ("Bank of America", "https://careers.bankofamerica.com/en-us", "Priority 3: finance target."),
     ("Fidelity", "https://jobs.fidelity.com/", "Priority 3: finance target."),
     ("Charles Schwab", "https://www.schwabjobs.com/search-jobs/intern/33727/1", "Priority 3: finance target."),

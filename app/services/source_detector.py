@@ -52,6 +52,12 @@ def detect_source_type(career_url: str) -> str:
         return "direct_html"
     if "wellsfargojobs.com" in host and "/jobs" in path:
         return "direct_html"
+    if "deshaw.com" in host and "/careers" in path:
+        return "direct_html"
+    if "shopify.com" in host and "/careers" in path:
+        return "direct_html"
+    if "careers.etsy.com" in host:
+        return "direct_html"
     if any(
         domain in host
         for domain in [
