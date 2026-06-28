@@ -67,6 +67,7 @@ def detect_source_type(career_url: str) -> str:
             "activisionblizzard.com",
             "careers.cisco.com",
             "careers.kbr.com",
+            "careers.rocket.com",
             "qualtrics.com",
             "wbd.com",
             "yelp.careers",
