@@ -7,6 +7,7 @@ from app.adapters.generic_static import GenericStaticAdapter
 from app.adapters.google_careers import GoogleCareersAdapter
 from app.adapters.greenhouse import GreenhouseAdapter
 from app.adapters.lever import LeverAdapter
+from app.adapters.nextjs_static import NextjsStaticAdapter
 from app.adapters.oracle_hcm import OracleHcmAdapter
 from app.adapters.phenom_static import PhenomStaticAdapter
 from app.adapters.smartrecruiters import SmartRecruitersAdapter
@@ -24,6 +25,7 @@ ADAPTERS: dict[str, JobSourceAdapter] = {
     "smartrecruiters": SmartRecruitersAdapter(),
     "phenom_static": PhenomStaticAdapter(),
     "oracle_hcm": OracleHcmAdapter(),
+    "nextjs_static": NextjsStaticAdapter(),
     "tesla": TeslaAdapter(),
     "direct_html": DirectHtmlAdapter(),
     "generic_static": GenericStaticAdapter(),

@@ -25,6 +25,7 @@ TRUSTED_ALERT_SOURCE_TYPES = {
     "direct_html",
     "phenom_static",
     "oracle_hcm",
+    "nextjs_static",
 }
 
 

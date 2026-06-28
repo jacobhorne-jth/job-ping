@@ -14,6 +14,7 @@ SUPPORTED_SOURCE_TYPES = {
     "direct_html",
     "phenom_static",
     "oracle_hcm",
+    "nextjs_static",
     "generic_static",
     "generic_playwright",
     "unknown",
@@ -58,11 +59,14 @@ def detect_source_type(career_url: str) -> str:
         return "direct_html"
     if "careers.etsy.com" in host:
         return "direct_html"
+    if "drw.com" in host and "/work-at-drw/listings" in path:
+        return "nextjs_static"
     if any(
         domain in host
         for domain in [
             "activisionblizzard.com",
             "careers.cisco.com",
+            "careers.kbr.com",
             "qualtrics.com",
             "wbd.com",
             "yelp.careers",
